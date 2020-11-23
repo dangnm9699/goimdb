@@ -55,12 +55,15 @@ func main() {
 			movie.RatingCount = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.ratings_wrapper > div.imdbRating > a > span[itemprop=ratingCount]")
 			// get List of Genres
 			var genres []string
-			e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > div.subtext > a[href]", func(i int, element *colly.HTMLElement) {
-				genres = append(genres, element.Text)
+			e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > div.subtext > a", func(i int, element *colly.HTMLElement) {
+				if element.Attr("title") == ""{
+					genres = append(genres, element.Text)
+				}
 			})
-			if len(genres) > 0 {
-				movie.Genres = genres[:len(genres)-1]
-			}
+			movie.Genres = genres
+			// get Duration
+			duration := e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > div.subtext > time")
+			movie.Duration = strings.TrimSpace(duration)
 			// get Poster
 			p1 := e.ChildAttr("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.poster > a > img", "src")
 			p2 := e.ChildAttr("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.slate_wrapper > div.poster > a > img", "src")
@@ -77,17 +80,47 @@ func main() {
 			cumulative := e.ChildText("div#main_bottom > div#titleDetails > div.txt-block:contains('Cumulative Worldwide Gross:')")
 			movie.Cumulative = getMoney(cumulative)
 			// get Director
-			movie.Director = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Director:') ~ a[href]")
+			var director string
+			director = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Director:') ~ a[href]")
+			if len(director) == 0 {
+				director = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Director:') ~ a[href]")
+			}
+			movie.Director = director
 			// get Stars
 			var stars []string
-			e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Stars:') ~ a[href]", func(i int, element *colly.HTMLElement) {
+			e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Star') ~ a[href]", func(i int, element *colly.HTMLElement) {
 				if element.Text != "See full cast & crew" {
 					stars = append(stars, element.Text)
 				}
 			})
+//			if len(stars) == 0 {
+//				e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Star:') ~ a[href]", func(i int, element *colly.HTMLElement) {
+//					if element.Text != "See full cast & crew" {
+//						stars = append(stars, element.Text)
+//					}
+//				})
+//			}
+			if len(stars) == 0 {
+				e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Star') ~ a[href]", func(i int, element *colly.HTMLElement) {
+					if element.Text != "See full cast & crew" {
+						stars = append(stars, element.Text)
+					}
+				})
+			}
+//			if len(stars) == 0 {
+//				e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Star:') ~ a[href]", func(i int, element *colly.HTMLElement) {
+//					if element.Text != "See full cast & crew" {
+//						stars = append(stars, element.Text)
+//					}
+//				})
+//			}
 			movie.Stars = stars
 			// get Country
-			country := e.ChildText("div#main_bottom > div#titleDetails > div.txt-block > h4.inline:contains('Country:') ~ a[href]")
+			var country []string
+			e.ForEach("div#main_bottom > div#titleDetails > div.txt-block > h4.inline:contains('Country:') ~ a[href]", func(i int, element *colly.HTMLElement) {
+				country = append(country, strings.TrimSpace(element.Text))
+			})
+			//country := e.ChildText("div#main_bottom > div#titleDetails > div.txt-block > h4.inline:contains('Country:') ~ a[href]")
 			movie.Country = country
 			// get StoryLine
 			storyLine := e.ChildText("div#main_bottom > div#titleStoryLine > div.inline.canwrap > p > span")
