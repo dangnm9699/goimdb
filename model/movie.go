@@ -3,6 +3,7 @@ package model
 type Movie struct {
 	ID          string   `json:"id" bson:"id"`
 	Name        string   `json:"name" bson:"name"`
+	Year        string   `json:"year" bson:"year"`
 	Rating      string   `json:"rating" bson:"rating"`
 	RatingCount string   `json:"rating_count" bson:"rating_count"`
 	Duration    string   `json:"duration" bson:"duration"`

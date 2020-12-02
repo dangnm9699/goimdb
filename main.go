@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"regexp"
 )
 
 const (
@@ -19,9 +20,19 @@ const (
 )
 
 var StartPointer *int
+var r *regexp.Regexp
 
 func init() {
 	StartPointer = flag.Int("start", 1, "Start IMDB ID")
+	r, _ = regexp.Compile("(.+)\\((\\d{4})\\)")
+}
+
+func extractName(name string) (string, string) {
+	rr := r.FindStringSubmatch(name)
+	if len(rr) == 3 {
+		return strings.TrimSpace(rr[1]), rr[2]
+	}
+	return strings.TrimSpace(name), ""
 }
 
 func main() {
@@ -48,7 +59,11 @@ func main() {
 		//
 		c.OnHTML("div#content-2-wide", func(e *colly.HTMLElement) {
 			// get Name
-			movie.Name = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > h1")
+			name := e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > h1")
+			movie.Name, movie.Year = extractName(name)
+			if movie.Year == "" {
+				return
+			}
 			// get Rating
 			movie.Rating = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.ratings_wrapper > div.imdbRating > div.ratingValue > strong > span[itemprop=ratingValue]")
 			// get RatingCount
