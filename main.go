@@ -20,10 +20,12 @@ const (
 )
 
 var StartPointer *int
+var LimitPointer *int
 var r *regexp.Regexp
 
 func init() {
 	StartPointer = flag.Int("start", 1, "Start IMDB ID")
+	LimitPointer = flag.Int("limit", 5000, "Stop IMDB ID")
 	r, _ = regexp.Compile("(.+)\\((\\d{4})\\)")
 }
 
@@ -43,7 +45,8 @@ func main() {
 	fmt.Println(db.ListDatabases())
 	flag.Parse()
 	start := *StartPointer
-	for count := start; true; count++ {
+	limit := *LimitPointer
+	for count := start; count<start+limit; count++ {
 		log.Println("Movie", count)
 		id := genId(count)
 		link := BaseURL + "tt" + id + "/"
