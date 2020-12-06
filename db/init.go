@@ -61,7 +61,7 @@ func InsertOne(data model.Movie) {
 }
 
 func ReplaceOne(data model.Movie) {
-	if _, err := Client.Database("bigdata").Collection("movie").ReplaceOne(context.TODO(), bson.M{"id": data.ID}, data, Opts); err != nil {
+	if _, err := Client.Database("imdb").Collection("movie").ReplaceOne(context.TODO(), bson.M{"id": data.ID}, data, Opts); err != nil {
 		logger.WriteLog(fmt.Sprintln(time.Now().Format(time.RFC1123), "[ERR]", err))
 	}
 }
