@@ -27,7 +27,7 @@ var (
 
 func init() {
 	StartPointer = flag.Int("start", 0, "Start IMDB ID")
-	LimitPointer = flag.Int("limit", 5000, "Stop IMDB ID")
+	LimitPointer = flag.Int("limit", 100000, "Stop IMDB ID")
 	f, _ := ioutil.ReadFile("id.txt")
 	fStr := string(f)
 	IDs = strings.Split(fStr, "\n")
@@ -51,8 +51,9 @@ func main() {
 		link := BaseURL + id + "/fullcredits"
 		//link := "https://www.imdb.com/title/tt4154796/fullcredits?"
 		var credits model.Credit
-		//credits.ID = id
-		credits.ID = "tt4154796"
+		credits.ID = id
+		log.Println(id)
+		//credits.ID = "tt4154796"
 		credits.CastCrew = make(map[string]interface{})
 		c := colly.NewCollector()
 		//

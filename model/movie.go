@@ -61,5 +61,8 @@ func ExtractYear(year string) string {
 	//if len(rr) == 3 {
 	//	return strings.TrimSpace(rr[1]), rr[2]
 	//}
+	if len(rr) < 2 {
+		return ""
+	}
 	return rr[1]
 }
