@@ -54,14 +54,8 @@ func ListDatabases() []string {
 	return databases
 }
 
-func InsertOne(data model.Movie) {
-	if _, err := Client.Database("bigdata").Collection("imdb").InsertOne(context.TODO(), data); err != nil {
-		logger.WriteLog(fmt.Sprintln(time.Now().Format(time.RFC1123), "[ERR]", err))
-	}
-}
-
 func ReplaceOne(data model.Movie) {
-	if _, err := Client.Database("imdb").Collection("movie").ReplaceOne(context.TODO(), bson.M{"id": data.ID}, data, Opts); err != nil {
+	if _, err := Client.Database("movie").Collection("general").ReplaceOne(context.TODO(), bson.M{"tconst": data.ID}, data, Opts); err != nil {
 		logger.WriteLog(fmt.Sprintln(time.Now().Format(time.RFC1123), "[ERR]", err))
 	}
 }
