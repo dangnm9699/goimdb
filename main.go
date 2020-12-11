@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/gocolly/colly"
 	"imdb/db"
@@ -9,47 +10,28 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"regexp"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 const (
-	BaseURL        = "https://www.imdb.com/title/"
-	NGo = 20
+	BaseURL = "https://www.imdb.com/title/"
 )
 
-//var StartPointer *int
-//var LimitPointer *int
-var r *regexp.Regexp
-var NFilm int
-var IDs []string
-var part int
+var (
+	StartPointer *int
+	LimitPointer *int
+	IDs          []string
+	Len          int
+)
 
 func init() {
-	//StartPointer = flag.Int("start", 1, "Start IMDB ID")
-	//LimitPointer = flag.Int("limit", 5000, "Stop IMDB ID")
-	r, _ = regexp.Compile("(.+)\\((\\d{4})\\)")
+	StartPointer = flag.Int("start", 0, "Start IMDB ID")
+	LimitPointer = flag.Int("limit", 5000, "Stop IMDB ID")
 	f, _ := ioutil.ReadFile("id.txt")
 	fStr := string(f)
-	slices := strings.Split(fStr, "\n")
-	NFilm = len(slices)
-	log.Println("[INFO] Number of Film:", NFilm)
-	part = NFilm / NGo
-	IDs = make([]string, NFilm)
-	for i := range IDs {
-		IDs[i] = slices[i]
-	}
-}
-
-func extractName(name string) (string, string) {
-	rr := r.FindStringSubmatch(name)
-	if len(rr) == 3 {
-		return strings.TrimSpace(rr[1]), rr[2]
-	}
-	return strings.TrimSpace(name), ""
+	IDs = strings.Split(fStr, "\n")
+	Len = len(IDs)
 }
 
 func main() {
@@ -58,127 +40,106 @@ func main() {
 		_ = logger.F.Close()
 	}()
 	fmt.Println("[INFO] List DB:", db.ListDatabases())
-	var wg sync.WaitGroup
-	//flag.Parse()
-	//start := *StartPointer
-	//limit := *LimitPointer
-	for i := 0; i < NGo; i++ {
-		wg.Add(1)
-		index := i
-		go func() {
-			for count := index * part; count < (index+1)*part; count++ {
-				if count > NFilm {
-					break
-				}
-				//id := genId(count)
-				//link := BaseURL + "tt" + id + "/"
-				id := IDs[count]
-				link := BaseURL + id + "/"
-				var movie model.Movie
-				movie.ID = id
-				c := colly.NewCollector()
-				//
-				c.OnResponse(func(r *colly.Response) {
-					if r.StatusCode != http.StatusOK {
-						logger.WriteLog(fmt.Sprintln("[DEBUG] Status Code", r.StatusCode))
-					}
-				})
-				//
-				c.OnHTML("div#content-2-wide", func(e *colly.HTMLElement) {
-					// get Name
-					name := e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > h1")
-					movie.Name, movie.Year = extractName(name)
-					if movie.Year == "" {
-						return
-					}
-					// get Rating
-					movie.Rating = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.ratings_wrapper > div.imdbRating > div.ratingValue > strong > span[itemprop=ratingValue]")
-					// get RatingCount
-					movie.RatingCount = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.ratings_wrapper > div.imdbRating > a > span[itemprop=ratingCount]")
-					// get List of Genres
-					var genres []string
-					e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > div.subtext > a", func(i int, element *colly.HTMLElement) {
-						if element.Attr("title") == "" {
-							genres = append(genres, element.Text)
+	flag.Parse()
+	start := *StartPointer
+	end := start + *LimitPointer
+	for count := start; count < end; count++ {
+		if count > Len {
+			break
+		}
+		id := IDs[count]
+		link := BaseURL + id + "/fullcredits"
+		//link := "https://www.imdb.com/title/tt4154796/fullcredits?"
+		var credits model.Credit
+		//credits.ID = id
+		credits.ID = "tt4154796"
+		credits.CastCrew = make(map[string]interface{})
+		c := colly.NewCollector()
+		//
+		c.OnResponse(func(r *colly.Response) {
+			if r.StatusCode != http.StatusOK {
+				logger.WriteLog(fmt.Sprintln("[DEBUG] Status Code", r.StatusCode))
+			}
+		})
+		//
+		c.OnHTML("div.article.listo", func(e *colly.HTMLElement) {
+			// Get general info
+			// ... Get poster
+			credits.Poster = e.ChildAttr("div.subpage_title_block > a > img", "src")
+			// ... Get name
+			credits.Name = e.ChildText("div.subpage_title_block > div.subpage_title_block__right-column > div.parent > h3 > a")
+			// ... Get year
+			credits.Year = model.ExtractYear(e.ChildText("div.subpage_title_block > div.subpage_title_block__right-column > div.parent > h3 > span"))
+			// Get full cast & crew info
+			keys := make([]string, 0)
+			e.ForEach("div.header > h4", func(i int, el *colly.HTMLElement) {
+				k := el.Attr("name")
+				keys = append(keys, k)
+			})
+			e.ForEach("div.header > table", func(i int, el *colly.HTMLElement) {
+				k := keys[i]
+				if k == "director" {
+					people := make([]model.Director, 0)
+					el.ForEach("tbody > tr", func(i int, elm *colly.HTMLElement) {
+						var p model.Director
+						p.ID = model.GetPersonID(elm.ChildAttr("td > a", "href"))
+						p.Name = strings.TrimSpace(elm.ChildText("td > a"))
+						people = append(people, p)
+					})
+					credits.CastCrew[k] = people
+				} else if k == "cast" {
+					people := make([]model.Cast, 0)
+					el.ForEach("tbody > tr", func(i int, elm *colly.HTMLElement) {
+						cl := elm.Attr("class")
+						if cl == "odd" || cl == "even" {
+							var p model.Cast
+							elm.ForEach("td", func(i int, elem *colly.HTMLElement) {
+								cla := elem.Attr("class")
+								if cla == "primary_photo" {
+									p.ID = model.GetPersonID(elem.ChildAttr("a", "href"))
+									p.Name = strings.TrimSpace(elem.ChildAttr("a > img", "title"))
+									p.Photo = elem.ChildAttr("a > img", "src")
+								}
+								if cla == "character" {
+									characters := strings.TrimSpace(elem.Text)
+									characters = strings.ReplaceAll(characters, "\n", "")
+									characters = strings.ReplaceAll(characters, "\t", "")
+									characters = strings.ReplaceAll(characters, "              ", " ")
+									characters = strings.ReplaceAll(characters, "       ", " ")
+									//log.Println(characters)
+									p.Character = characters
+								}
+							})
+							people = append(people, p)
 						}
 					})
-					movie.Genres = genres
-					// get Duration
-					duration := e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > div.subtext > time")
-					movie.Duration = strings.TrimSpace(duration)
-					// get Poster
-					p1 := e.ChildAttr("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.poster > a > img", "src")
-					p2 := e.ChildAttr("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.slate_wrapper > div.poster > a > img", "src")
-					if p1 != "" {
-						movie.Poster = p1
-					}
-					if p2 != "" {
-						movie.Poster = p2
-					}
-					// get Budget
-					budget := e.ChildText("div#main_bottom > div#titleDetails > div.txt-block:contains('Budget:')")
-					movie.Budget = getMoney(budget)
-					// get Cumulative
-					cumulative := e.ChildText("div#main_bottom > div#titleDetails > div.txt-block:contains('Cumulative Worldwide Gross:')")
-					movie.Cumulative = getMoney(cumulative)
-					// get Director
-					var director string
-					director = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Director:') ~ a[href]")
-					if len(director) == 0 {
-						director = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Director:') ~ a[href]")
-					}
-					movie.Director = director
-					// get Stars
-					var stars []string
-					e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Star') ~ a[href]", func(i int, element *colly.HTMLElement) {
-						if element.Text != "See full cast & crew" {
-							stars = append(stars, element.Text)
-						}
-					})
-					if len(stars) == 0 {
-						e.ForEach("div#main_top > div.title-overview > div#title-overview-widget > div.posterWithPlotSummary > div.plot_summary_wrapper > div.plot_summary > div.credit_summary_item > h4.inline:contains('Star') ~ a[href]", func(i int, element *colly.HTMLElement) {
-							if element.Text != "See full cast & crew" {
-								stars = append(stars, element.Text)
+					credits.CastCrew[k] = people
+				} else {
+					people := make([]model.Person, 0)
+					el.ForEach("tbody > tr", func(i int, elm *colly.HTMLElement) {
+						var p model.Person
+						elm.ForEach("td", func(i int, elem *colly.HTMLElement) {
+							cla := elem.Attr("class")
+							if cla == "name" {
+								p.ID = model.GetPersonID(elem.ChildAttr("a", "href"))
+								p.Name = strings.TrimSpace(elem.ChildText("a"))
+							}
+							if cla == "credit" {
+								p.Credit = strings.TrimSpace(elem.Text)
 							}
 						})
-					}
-					movie.Stars = stars
-					// get Country
-					var country []string
-					e.ForEach("div#main_bottom > div#titleDetails > div.txt-block > h4.inline:contains('Country:') ~ a[href]", func(i int, element *colly.HTMLElement) {
-						country = append(country, strings.TrimSpace(element.Text))
+						people = append(people, p)
 					})
-					movie.Country = country
-					// get StoryLine
-					storyLine := e.ChildText("div#main_bottom > div#titleStoryLine > div.inline.canwrap > p > span")
-					movie.StoryLine = strings.TrimSpace(storyLine)
-					fmt.Println(movie)
-					db.ReplaceOne(movie)
-				})
-				//
-				_ = c.Visit(link)
-			}
-			wg.Done()
-		}()
+					credits.CastCrew[k] = people
+				}
+
+			})
+			log.Println(credits)
+			db.ReplaceOne(credits)
+		})
+		//
+		_ = c.Visit(link)
 	}
-	wg.Wait()
 	log.Println("[INFO] Done, wait for 10 seconds")
 	time.Sleep(10 * time.Second)
-}
-
-func getMoney(p string) string {
-	if len(p) == 0 {
-		return p
-	}
-	a := strings.Split(p, ":")
-	a = strings.Split(a[1], "(")
-	return strings.TrimSpace(a[0])
-}
-
-func genId(stt int) string {
-	a := strconv.Itoa(stt)
-	if len(a) > 7 {
-		return a
-	}
-	return strings.Repeat("0", 7-len(a)) + a
 }
