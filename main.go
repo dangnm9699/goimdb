@@ -28,7 +28,7 @@ var (
 
 func init() {
 	StartPointer = flag.Int("start", 0, "Start IMDB ID")
-	LimitPointer = flag.Int("limit", 100000, "Stop IMDB ID")
+	LimitPointer = flag.Int("limit", 50000, "Stop IMDB ID")
 	r, _ = regexp.Compile("(.+)\\((\\d{4})\\)")
 	f, _ := ioutil.ReadFile("id.txt")
 	fStr := string(f)
@@ -74,10 +74,6 @@ func main() {
 			// get Name
 			name := e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.titleBar > div.title_wrapper > h1")
 			movie.Name, movie.Year = extractName(name)
-			if movie.Year == "" {
-				fmt.Println("e")
-				return
-			}
 			// get Rating
 			movie.Rating = e.ChildText("div#main_top > div.title-overview > div#title-overview-widget > div.vital > div.title_block > div.title_bar_wrapper > div.ratings_wrapper > div.imdbRating > div.ratingValue > strong > span[itemprop=ratingValue]")
 			// get RatingCount
