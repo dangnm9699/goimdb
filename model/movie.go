@@ -7,12 +7,11 @@ type Movie struct {
 	Rating      string   `json:"rating" bson:"rating"`
 	RatingCount string   `json:"rating_count" bson:"rating_count"`
 	Duration    string   `json:"duration" bson:"duration"`
-	Genres      []string `json:"genres" bson:"genres"`
-	Poster      string   `json:"poster" bson:"poster"`
+	Genres      string `json:"genres" bson:"genres"`
 	Budget      string   `json:"budget" bson:"budget"`
 	Cumulative  string   `json:"cumulative" bson:"cumulative"`
 	Director    string   `json:"director" bson:"director"`
-	Stars       []string `json:"stars" bson:"stars"`
-	Country     []string `json:"country" bson:"country"`
+	Stars       string `json:"stars" bson:"stars"`
+	Country     string `json:"country" bson:"country"`
 	StoryLine   string   `json:"story_line" bson:"story_line"`
 }
